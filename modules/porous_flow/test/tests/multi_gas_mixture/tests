@@ -1,0 +1,11 @@
+[Tests]
+  [multi_component_gas_mixture]
+    type = RunApp
+    input = multi_component_gas_mixture.i
+    check_input = true
+    requirement = 'The system shall be able to model a multiple gas mixture problem in porous media.'
+    # issues = '#26270'
+    # design = 'porous_flow/solute_tracer_transport.md'
+  []
+[]
+

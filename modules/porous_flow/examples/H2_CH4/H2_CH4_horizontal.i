@@ -1,41 +1,40 @@
-time = 157680000
+time = 2.592e6
 
 [Mesh]
   [gen]
     type = GeneratedMeshGenerator
     dim = 2
-    nx = 1
-    xmin = -5
-    xmax = 5
-    ny = 100
+    nx = 40
+    xmin = 0
+    xmax = 100
+    ny = 40
     ymin = -500
     ymax = -400
   []
 
-  [top_box]
+  [left_box]
     type = ParsedSubdomainMeshGenerator
     input = gen
-    combinatorial_geometry = 'y >= -448 & y <= -400'
+    combinatorial_geometry = 'x >= -1 & x <= 48'
     block_id = 1
-    block_name = top_box
-  []
-
-  [bot_box]
-    type = ParsedSubdomainMeshGenerator
-    input = top_box
-    combinatorial_geometry = 'y > -550 & y < -452'
-    block_id = 2
-    block_name = bot_box
+    block_name = left_box
   []
 
   [mid_box]
     type = ParsedSubdomainMeshGenerator
-    input = bot_box
-    combinatorial_geometry = 'y >= -452 & y < -448'
-    block_id = 3
+    input = left_box
+    combinatorial_geometry = 'x > 48 & x <= 52'
+    block_id = 2
     block_name = mid_box
   []
 
+  [right_box]
+    type = ParsedSubdomainMeshGenerator
+    input = mid_box
+    combinatorial_geometry = 'x > 52 & x <= 100'
+    block_id = 3
+    block_name = right_box
+  []
 []
 
 [GlobalParams]
@@ -65,11 +64,11 @@ time = 157680000
     variable = pp_H2
   []
 
-  # [adv_H2]
-  #   type = PorousFlowFullySaturatedDarcyFlow
-  #   variable = pp_H2
-  #   fluid_component = 1
-  # []
+  [adv_H2]
+    type = PorousFlowFullySaturatedDarcyFlow
+    variable = pp_H2
+    fluid_component = 1
+  []
 
   [diff_H2]
     type = PorousFlowDispersiveFlux
@@ -85,11 +84,11 @@ time = 157680000
     variable = mass_frac_CH4
   []
 
-  # [adv_CH4]
-  #   type = PorousFlowFullySaturatedDarcyFlow
-  #   fluid_component = 0
-  #   variable = mass_frac_CH4
-  # []
+  [adv_CH4]
+    type = PorousFlowFullySaturatedDarcyFlow
+    fluid_component = 0
+    variable = mass_frac_CH4
+  []
 
   [diff_CH4]
     type = PorousFlowDispersiveFlux
@@ -124,7 +123,6 @@ time = 157680000
   [H2]
     type = HydrogenFluidProperties
   []
-
   [CH4]
     type = MethaneFluidProperties
   []
@@ -146,16 +144,10 @@ time = 157680000
     permeability = '1E-14 0 0   0 1E-14 0   0 0 1E-14'
   []
 
-  # [H2]
-  #   type = PorousFlowSingleComponentFluid
-  #   fp = "H2"
-  #   phase = 0
-  # []
-
   [H2]
     type = PorousFlowMultiComponentGasMixture
     fp = 'CH4 H2'
-    x = mass_frac_CH4
+    x = 'mass_frac_CH4'
     phase = 0
   []
 
@@ -171,7 +163,7 @@ time = 157680000
 
   [diff]
     type = PorousFlowDiffusivityConst
-    diffusion_coeff = '0.0000726 0.0000726'
+    diffusion_coeff = '0.00000726 0.00000726'
     tortuosity = 1
   []
 
@@ -184,51 +176,78 @@ time = 157680000
 []
 
 [ICs]
-  [mass_frac_CH4_bot]
-    type = ConstantIC
-    variable = mass_frac_CH4
-    value = 1
-    block = bot_box
-  []
+  # [mass_frac_CH4]
+  #   type = BoundingBoxIC
+  #   x1 = 0
+  #   x2 = 50
+  #   y1 = -500
+  #   y2 = -400
+  #   variable = mass_frac_CH4
+  #   inside = 1
+  #   outside = 0.1
+  #   # type = MultiBoundingBoxIC
+  #   # corners = '0 -500 0   48.5 -500 0   51.5 -500 0'
+  #   # opposite_corners = '48.5 -400 0   51.5 -400 0   100 -400 0'
+  #   # inside = '1.0 0.5 0'
+  #   # variable = mass_frac_CH4
+  # []
 
-  [mass_frac_CH4_top]
+  [mass_frac_CH4_left]
     type = ConstantIC
+    value = 1
     variable = mass_frac_CH4
-    value = 0
-    block = top_box
+    block = left_box
   []
 
   [mass_frac_CH4_mid]
-    type = ConstantIC
-    variable = mass_frac_CH4
-    value = 0.4
-    block = top_box
-  []
-
-  [pressure_top]
     type = FunctionIC
-    variable = pp_H2
-    function = '4e6 + 9.81* 0.08375*(-400-y)'
-    block = top_box
-  []
-
-  [pressure_bot]
-    type = ConstantIC
-    variable = pp_H2
-    value = 4.04e6
-    block = bot_box
-  []
-
-  [pressure_mid]
-    type = ConstantIC
-    variable = pp_H2
-    value = 4.04e6
+    function = '(52-x)/(52-48)'
+    variable = mass_frac_CH4
     block = mid_box
   []
 
+  [mass_frac_CH4_right]
+    type = ConstantIC
+    value = 0
+    variable = mass_frac_CH4
+    block = right_box
+  []
+
+  [pressure]
+    type = ConstantIC
+    variable = pp_H2
+    value = 4e6
+  []
+
+  # [pressure_left]
+  #   type = FunctionIC
+  #   variable = pp_H2
+  #   function = '4e6+9.81*25*(-400-y)'
+  #   block = left_box
+  # []
+
+  # [pressure_mid]
+  #   type = FunctionIC
+  #   variable = pp_H2
+  #   function = '4e6+9.81*25*(-400-y)'
+  #   block = mid_box
+  # []
+
+  # [pressure_right]
+  #   type = FunctionIC
+  #   variable = pp_H2
+  #   function = '4e6+9.81*2.9*(-400-y)'
+  #   block = right_box
+  # []
 []
 
 [BCs]
+  # [constant_porepressure]
+  #   type = DirichletBC
+  #   variable = pp_H2
+  #   value = 4e6
+  #   boundary = 'top'
+  # []
 []
 
 [Preconditioning]
@@ -243,51 +262,46 @@ time = 157680000
 [Executioner]
   type = Transient
   end_time = ${time}
-  dtmax = 1e6
+  dtmax = 5e4
   nl_rel_tol = 1e-4
   nl_abs_tol = 1e-8
+  l_max_its = 500
   [TimeStepper]
     type = IterationAdaptiveDT
     dt = 1000
   []
-[]
+  # [TimeStepper]
+  #   type = FunctionDT
+  #   function = 'if(t<1e5, 5e3, if(t < 2e5, 1e4, if(t<1e6,5e4,if(t<5e6,1e5,2e6))))'
 
-[Postprocessors]
+  # []
 []
 
 [VectorPostprocessors]
-  [mass_frac_CH4]
+  [mid_line_density]
     type = LineValueSampler
-    start_point = '0 -400 0.0'
-    end_point = '0 -500 0.0'
-    variable = mass_frac_CH4
-    sort_by = y
-    num_points = 500
-  []
-
-  [pressure]
-    type = LineValueSampler
-    start_point = '0 -400 0.0'
-    end_point = '0 -500 0.0'
-    variable = pp_H2
-    sort_by = y
-    num_points = 500
-  []
-
-  [density]
-    type = LineValueSampler
-    start_point = '0 -400 0.0'
-    end_point = '0 -500 0.0'
+    start_point = '0 -450 0.0'
+    end_point = '100 -450 0.0'
     variable = density
-    sort_by = y
+    sort_by = x
+    num_points = 500
+  []
+
+  [mid_line_mass_frac_CH4]
+    type = LineValueSampler
+    start_point = '0 -450 0.0'
+    end_point = '100 -450 0.0'
+    variable = mass_frac_CH4
+    sort_by = x
     num_points = 500
   []
 []
 
 [Outputs]
-  sync_times = '259200 2592000 31536000 157680000 '
-  file_base = H2_CH4_vertical_${time}
-  [CSV]
+  sync_times = '1 86400 2.592e6 31.536e6 157.680e6 '
+  file_base = H2_CH4_horizontal_${time}
+
+  [density_mid_output]
     type = CSV
     sync_only = true
   []
