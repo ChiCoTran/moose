@@ -39,13 +39,17 @@ protected:
   const bool _is_xnacl_nodal;
 
   /// NaCl mass fraction at the qps or nodes
-  const VariableValue & _xnacl;
+  const GenericVariableValue<is_ad> & _xnacl;
 
   usingPorousFlowFluidPropertiesMembers;
   using PorousFlowMultiComponentFluidBaseTempl<is_ad>::_ddensity_dX;
   using PorousFlowMultiComponentFluidBaseTempl<is_ad>::_dviscosity_dX;
   using PorousFlowMultiComponentFluidBaseTempl<is_ad>::_dinternal_energy_dX;
   using PorousFlowMultiComponentFluidBaseTempl<is_ad>::_denthalpy_dX;
+  using PorousFlowFluidPropertiesBaseTempl<is_ad>::name;
+  using PorousFlowFluidPropertiesBaseTempl<is_ad>::_fe_problem;
+  using PorousFlowFluidPropertiesBaseTempl<is_ad>::_app;
+  using PorousFlowFluidPropertiesBaseTempl<is_ad>::_tid;
 };
 
 typedef PorousFlowBrineTempl<false> PorousFlowBrine;
