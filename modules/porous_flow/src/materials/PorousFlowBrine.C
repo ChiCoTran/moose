@@ -31,8 +31,9 @@ template <bool is_ad>
 PorousFlowBrineTempl<is_ad>::PorousFlowBrineTempl(const InputParameters & parameters)
   : PorousFlowMultiComponentFluidBaseTempl<is_ad>(parameters),
     _is_xnacl_nodal(isCoupled("xnacl") ? getFieldVar("xnacl", 0)->isNodal() : false),
-    _xnacl(_nodal_material && _is_xnacl_nodal ? this->template coupledDofValues("xnacl")
-                                              : this->template coupledValue("xnacl"))
+    _xnacl(_nodal_material && _is_xnacl_nodal
+               ? this->template coupledGenericDofValue<is_ad>("xnacl")
+               : this->template coupledGenericValue<is_ad>("xnacl"))
 {
   if (parameters.isParamSetByUser("water_fp"))
   {
@@ -44,18 +45,18 @@ PorousFlowBrineTempl<is_ad>::PorousFlowBrineTempl(const InputParameters & parame
   }
 
   // BrineFluidProperties UserObject
-  const std::string brine_name = this->template name() + ":brine";
+  const std::string brine_name = name() + ":brine";
   {
     const std::string class_name = "BrineFluidProperties";
-    InputParameters params = this->template _app.getFactory().getValidParams(class_name);
+    InputParameters params = _app.getFactory().getValidParams(class_name);
 
     if (parameters.isParamSetByUser("water_fp"))
       params.set<UserObjectName>("water_fp") = _water_fp->name();
 
-    if (this->template _tid == 0)
-      this->template _fe_problem.addUserObject(class_name, brine_name, params);
+    if (_tid == 0)
+      _fe_problem.addUserObject(class_name, brine_name, params);
   }
-  _brine_fp = &this->template _fe_problem.getUserObject<BrineFluidProperties>(brine_name);
+  _brine_fp = &_fe_problem.template getUserObject<BrineFluidProperties>(brine_name);
 }
 
 template <bool is_ad>
@@ -65,6 +66,7 @@ PorousFlowBrineTempl<is_ad>::initQpStatefulProperties()
   if (_compute_rho_mu)
     (*_density)[_qp] = _brine_fp->rho_from_p_T_X(
         _porepressure[_qp][_phase_num], _temperature[_qp] + _t_c2k, _xnacl[_qp]);
+
   if (_compute_internal_energy)
     (*_internal_energy)[_qp] =
         _brine_fp->e_from_p_T_X(MetaPhysicL::raw_value(_porepressure[_qp][_phase_num]),
@@ -81,37 +83,50 @@ PorousFlowBrineTempl<is_ad>::computeQpProperties()
 {
   const Real Tk = MetaPhysicL::raw_value(_temperature[_qp]) + _t_c2k;
 
+  // Density and derivatives wrt pressure and temperature
   if (_compute_rho_mu)
   {
-    // Density and derivatives wrt pressure and temperature
-    Real rho, drho_dp, drho_dT, drho_dx;
-    (*_ddensity_dX)[_qp].resize(1);
-    _brine_fp->rho_from_p_T_X(MetaPhysicL::raw_value(_porepressure[_qp][_phase_num]),
-                              Tk,
-                              _xnacl[_qp],
-                              rho,
-                              drho_dp,
-                              drho_dT,
-                              drho_dx);
-    (*_density)[_qp] = rho;
-    (*_ddensity_dp)[_qp] = drho_dp;
-    (*_ddensity_dT)[_qp] = drho_dT;
-    (*_ddensity_dX)[_qp][0] = drho_dx;
+    if (is_ad)
+    {
+      (*_density)[_qp] = _brine_fp->rho_from_p_T_X(
+          _porepressure[_qp][_phase_num], _temperature[_qp] + _t_c2k, _xnacl[_qp]);
 
-    // Viscosity and derivatives wrt pressure and temperature
-    Real mu, dmu_dp, dmu_dT, dmu_dx;
-    (*_dviscosity_dX)[_qp].resize(1);
-    _brine_fp->mu_from_p_T_X(MetaPhysicL::raw_value(_porepressure[_qp][_phase_num]),
-                             Tk,
-                             _xnacl[_qp],
-                             mu,
-                             dmu_dp,
-                             dmu_dT,
-                             dmu_dx);
-    (*_viscosity)[_qp] = mu;
-    (*_dviscosity_dp)[_qp] = dmu_dp;
-    (*_dviscosity_dT)[_qp] = dmu_dT;
-    (*_dviscosity_dX)[_qp][0] = dmu_dx;
+      (*_viscosity)[_qp] = _brine_fp->mu_from_p_T_X(
+          _porepressure[_qp][_phase_num], _temperature[_qp] + _t_c2k, _xnacl[_qp]);
+    }
+    else
+    {
+      Real rho, drho_dp, drho_dT, drho_dx;
+      (*_ddensity_dX)[_qp].resize(1);
+
+      _brine_fp->rho_from_p_T_X(MetaPhysicL::raw_value(_porepressure[_qp][_phase_num]),
+                                MetaPhysicL::raw_value(_temperature[_qp]) + _t_c2k,
+                                MetaPhysicL::raw_value(_xnacl[_qp]),
+                                rho,
+                                drho_dp,
+                                drho_dT,
+                                drho_dx);
+      (*_density)[_qp] = rho;
+      (*_ddensity_dp)[_qp] = drho_dp;
+      (*_ddensity_dT)[_qp] = drho_dT;
+      (*_ddensity_dX)[_qp][0] = drho_dx;
+
+      // Viscosity and derivatives wrt pressure and temperature
+      Real mu, dmu_dp, dmu_dT, dmu_dx;
+      (*_dviscosity_dX)[_qp].resize(1);
+
+      _brine_fp->mu_from_p_T_X(MetaPhysicL::raw_value(_porepressure[_qp][_phase_num]),
+                               MetaPhysicL::raw_value(_temperature[_qp]) + _t_c2k,
+                               MetaPhysicL::raw_value(_xnacl[_qp]),
+                               mu,
+                               dmu_dp,
+                               dmu_dT,
+                               dmu_dx);
+      (*_viscosity)[_qp] = mu;
+      (*_dviscosity_dp)[_qp] = dmu_dp;
+      (*_dviscosity_dT)[_qp] = dmu_dT;
+      (*_dviscosity_dX)[_qp][0] = dmu_dx;
+    }
   }
 
   // Internal energy and derivatives wrt pressure and temperature
